@@ -1,0 +1,174 @@
+<html>
+<head>
+	<style type="text/css" media="screen">
+		.grid>span {
+			display:block;
+			float:left;
+			width: 30px;
+			height: 30px;
+			font-size: 26px;
+			background: #eee;
+			margin: 5px;
+			text-align:center;
+		}
+		.grid span em {
+			display: none;
+		}
+		.grid span.highlight em, 
+		.grid span.opponent em,
+		.grid span.fixed em 
+		{
+			display: inline;
+		}
+		.grid span.highlight {
+			background: yellow;
+		}
+		.grid span.fixed {
+			background: green;
+		}
+		.grid span.opponent {
+			background: red;
+		}
+		.grid {
+			width: 180px;
+		}
+		#player1space, #player2space {
+			width: 200px;
+			float: left;
+		}
+		.playing {
+			background: pink;
+		}
+		
+	</style>
+	<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js" type="text/javascript"></script> 
+	<script src="http://js.pusherapp.com/1.8/pusher.min.js" type="text/javascript"></script>
+	<script type="text/javascript">
+		var pusher = new Pusher('5d01c573aff20a7f976b');
+    var tc = pusher.subscribe('private-test_channel');
+
+		var gameStates = {
+			play: 1,
+			wait: 0
+		};
+		
+		var Player = function(name, elid){
+			var self = this;
+			var playState = gameStates['wait'];
+			var choices = [];
+			var takenTiles = [];
+			
+			this.startTurn = function(){
+				choices = [];
+				$('#player'+name+'space').addClass('playing')
+				playState = gameStates['play'];
+				currPlayer = this;
+			};
+			
+			this.endTurn = function(){
+				$('#player'+name+'space').removeClass('playing')
+				playState = gameStates['wait'];
+				tc.trigger('client-end_turn', {name: name, choices: choices});
+			};
+			
+			this.makeSelection = function(el){
+				choices.push({id: $(el).attr('class'), value: $(el).text()});
+				tc.trigger('client-highlight', $(el).attr('class'))
+				$(el).addClass('highlight');
+				if (choices.length == 2){
+					if (choices[0].value == choices[1].value){
+						$('.highlight').removeClass('highlight').addClass('fixed')
+					} else {
+						removeHighlights()
+					}
+					self.endTurn();
+				}
+			}
+			
+			tc.bind('end_turn', function(data){
+				// only respond to anything the other opponent does if I'm waiting for my turn
+				if (data.name != name && playState == gameStates['wait']){
+					// apply opponent`s changes
+					if (data.choices[0].value == data.choices[1].value){
+						$(elid+' .'+ data.choices[0].id).addClass('opponent')
+						$(elid+' .'+ data.choices[1].id).addClass('opponent')
+						self.endTurn();
+					} else {
+						removeHighlights();
+						self.startTurn();
+					}
+				}
+			});
+			
+			tc.bind('highlight', function(data){
+				if (playState == gameStates['wait']){
+					$(elid+' .'+ data).addClass('highlight')
+				}
+			})
+			
+			$(elid + ' span').live('click', function(evt){
+				// only if it is my turn
+				if (playState == gameStates['play']){
+					self.makeSelection(this)
+				} else {
+					alert('not your turn')
+				}
+				return false;
+			});
+			
+			var removeHighlights = function(){
+				setTimeout(function(){
+					$(elid + ' .highlight').removeClass('highlight')
+				}, 500);
+			}
+		};
+		
+		player1 = new Player('1', '#grid');
+		
+		var players = [
+			player1,
+			player2
+		];
+		
+		var gameState = 'wait';
+		var grid = [];
+		
+		for (var i=0; i < 8; i++) {
+			grid.push(i)
+			grid.push(i)
+		};
+		
+		Array.prototype.shuffle = function() {
+			var s = [];
+			while (this.length) s.push(this.splice(Math.random() * this.length, 1));
+			while (s.length) this.push(s.pop());
+			return this;
+		}
+		grid.shuffle();
+		
+		window.onload = function(){
+			currPlayer = players[0]
+			currPlayer.startTurn();
+			for (var i=0; i < grid.length; i++) {
+				$('#grid').append('<span class="tile'+i+'"><em>'+grid[i]+'</em></span>')
+				$('#grid2').append('<span class="tile'+i+'"><em>'+grid[i]+'</em></span>')
+			};
+			
+		};
+		
+	</script>
+
+</head>
+<body>
+	<div id="player1space">
+	<span id="player1name">player 1</span>
+	<div class="grid" id="grid"></div>
+	</div>
+
+	<div id="player2space">	
+	<span id="player2name">player 2</span>
+	<div class="grid" id="grid2"></div>
+	</div>
+		
+</body>
+</html>
