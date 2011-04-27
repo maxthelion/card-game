@@ -8,6 +8,7 @@
 require 'rubygems'
 require 'sinatra'
 require 'pusher'
+require 'uuid'
 
 require 'pushercreds'
 
@@ -28,6 +29,7 @@ get '/' do
 end
 
 post '/pusher/auth' do
+  session['session_id'] ||= UUID.generate
   response = Pusher[params[:channel_name]].authenticate(params[:socket_id])
   return response.to_json
 end
